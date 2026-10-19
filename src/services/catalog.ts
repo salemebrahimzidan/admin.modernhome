@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { isStoragePath, signPaths, type GalleryImage } from './images'
+import { isStoragePath, PRODUCT_IMAGE_BUCKET, signPaths, type GalleryImage } from './images'
 
 export interface AdminCategory {
   id: string
@@ -181,20 +181,40 @@ export async function createCategory(input: {
 
 export async function updateCategory(
   id: string,
-  patch: { nameAr?: string; nameEn?: string; visible?: boolean; sortOrder?: number },
+  patch: { nameAr?: string; nameEn?: string; slug?: string; visible?: boolean; sortOrder?: number },
 ): Promise<void> {
   const row: {
     name_ar?: string
     name_en?: string
+    slug?: string
     is_visible?: boolean
     sort_order?: number
   } = {}
   if (patch.nameAr !== undefined) row.name_ar = patch.nameAr
   if (patch.nameEn !== undefined) row.name_en = patch.nameEn
+  if (patch.slug !== undefined) row.slug = patch.slug
   if (patch.visible !== undefined) row.is_visible = patch.visible
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
   const { error } = await supabase.from('categories').update(row).eq('id', id)
   if (error) throw error
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { count, error: countError } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', id)
+  if (countError) throw countError
+  if (count && count > 0) {
+    throw new Error('لا يمكن حذف القسم لأن به منتجات. انقل المنتجات إلى قسم آخر أولاً.')
+  }
+  const { error } = await supabase.from('categories').delete().eq('id', id)
+  if (error) {
+    if (error.message.toLowerCase().includes('permission denied')) {
+      throw new Error('حذف الأقسام غير مسموح لهذا الحساب في قاعدة البيانات.')
+    }
+    throw error
+  }
 }
 
 export async function createProduct(input: {
@@ -219,6 +239,30 @@ export async function createProduct(input: {
     .single()
   if (error) throw error
   return data.id as string
+}
+
+export async function deleteProduct(product: AdminProduct): Promise<void> {
+  if (product.variants.length > 0) {
+    const removedVariants = await supabase.from('product_variants').delete().eq('product_id', product.id)
+    if (removedVariants.error) throw productDeleteError(removedVariants.error)
+  }
+  const removed = await supabase.from('products').delete().eq('id', product.id)
+  if (removed.error) throw productDeleteError(removed.error)
+  const paths = product.images.map((image) => image.path).filter(isStoragePath)
+  if (paths.length > 0) {
+    await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove(paths)
+  }
+}
+
+function productDeleteError(error: { message: string; code?: string }): Error {
+  const message = error.message.toLowerCase()
+  if (message.includes('permission denied') || error.code === '42501') {
+    return new Error('حذف المنتجات غير مسموح لهذا الحساب في قاعدة البيانات.')
+  }
+  if (error.code === '23503' || message.includes('foreign key')) {
+    return new Error('لا يمكن حذف المنتج لأنه مرتبط بطلب أو سلة.')
+  }
+  return new Error(error.message || 'تعذر حذف المنتج')
 }
 
 export async function updateProduct(

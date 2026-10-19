@@ -22,13 +22,13 @@ export default function Shell() {
   const { session, signOut } = useAuth()
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="bg-[#121826] text-white md:min-h-screen">
+    <div className="min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="flex flex-col bg-[#121826] text-white md:sticky md:top-0 md:h-dvh">
         <div className="px-5 py-5">
           <p className="text-lg font-semibold tracking-tight">Modern Home</p>
           <p className="text-xs text-white/60">لوحة إدارة المتجر</p>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:block md:space-y-1 md:px-3">
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:block md:min-h-0 md:flex-1 md:space-y-1 md:overflow-y-auto md:px-3">
           {links.map((link) => (
             <NavLink
               key={link.to}
@@ -46,22 +46,20 @@ export default function Shell() {
             </NavLink>
           ))}
         </nav>
-      </aside>
-      <div className="min-w-0">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#e7ebf0] bg-white/90 px-4 py-3 backdrop-blur md:px-8">
-          <p className="truncate text-sm text-[#667085]">{session?.user.email}</p>
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3 md:block">
+          <p className="truncate text-xs text-white/60">{session?.user.email}</p>
           <button
             type="button"
-            className="rounded-xl border border-[#e7ebf0] px-3 py-1.5 text-sm hover:bg-[#f3f5f8]"
+            className="shrink-0 rounded-xl bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15 md:mt-3 md:w-full"
             onClick={() => void signOut()}
           >
             خروج
           </button>
-        </header>
-        <main className="px-4 py-6 md:px-8">
-          <Outlet />
-        </main>
-      </div>
+        </div>
+      </aside>
+      <main className="min-w-0 w-full px-4 py-6 md:px-6">
+        <Outlet />
+      </main>
     </div>
   )
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, PageTitle } from '../components/ui'
 import { money, orderStatusLabel, paymentStatusLabel, when } from '../lib/text'
 import { fetchProducts, type AdminProduct } from '../services/catalog'
 import { fetchOrders, type AdminOrder } from '../services/orders'
@@ -45,100 +44,268 @@ export default function Dashboard() {
     return counts
   }, {})
 
-  const stats = [
-    { label: 'المنتجات', value: String(products.length) },
-    { label: 'الظاهرة في المتجر', value: String(products.filter((product) => product.visible).length) },
-    { label: 'وحدات المخزون النشط', value: String(activeStock) },
-    { label: 'مخزون منخفض', value: String(lowStock.length) },
-    { label: 'مدفوعات بانتظار الإجراء', value: String(awaiting.length) },
-    { label: 'محصّل', value: money(paidTotal) },
+  const visibleCount = products.filter((product) => product.visible).length
+
+  const metrics = [
+    {
+      label: 'المنتجات',
+      value: String(products.length),
+      to: '/products',
+      card: 'border-[#bfdbfe] bg-[#eff6ff] hover:border-[#93c5fd]',
+      valueColor: 'text-[#1d4ed8]',
+    },
+    {
+      label: 'الظاهرة في المتجر',
+      value: String(visibleCount),
+      to: '/products',
+      card: 'border-[#a7f3d0] bg-[#ecfdf5] hover:border-[#6ee7b7]',
+      valueColor: 'text-[#047857]',
+    },
+    {
+      label: 'وحدات المخزون النشط',
+      value: String(activeStock),
+      to: '/inventory',
+      card: 'border-[#fde68a] bg-[#fffbeb] hover:border-[#fcd34d]',
+      valueColor: 'text-[#b45309]',
+    },
+    {
+      label: 'مخزون منخفض',
+      value: String(lowStock.length),
+      to: '/inventory',
+      card:
+        lowStock.length > 0
+          ? 'border-[#fecdd3] bg-[#fff1f2] hover:border-[#fda4af]'
+          : 'border-[#bbf7d0] bg-[#f0fdf4] hover:border-[#86efac]',
+      valueColor: lowStock.length > 0 ? 'text-[#be123c]' : 'text-[#15803d]',
+    },
   ]
 
   return (
-    <div>
-      <PageTitle title="المؤشرات" detail="ملخص الكتالوج والطلبات والمدفوعات من قاعدة البيانات الحالية." />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {stats.map((stat) => (
-          <Card key={stat.label}>
-            <p className="text-sm text-[#667085]">{stat.label}</p>
-            <p className="mt-2 text-3xl font-semibold">{stat.value}</p>
-          </Card>
+    <div className="w-full">
+      <header className="mb-5">
+        <h1 className="text-3xl font-semibold tracking-tight text-[#121826]">المؤشرات</h1>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-[#667085]">
+          ملخص الكتالوج والطلبات والمدفوعات من قاعدة البيانات الحالية.
+        </p>
+      </header>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <Link
+          to="/payments"
+          className="rounded-2xl bg-[#0f766e] px-4 py-4 text-white shadow-sm transition hover:bg-[#0d655e]"
+        >
+          <p className="text-sm text-white/70">محصّل</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight">{money(paidTotal)}</p>
+          <p className="mt-3 text-xs leading-5 text-white/80">{awaiting.length} مدفوعات بانتظار الإجراء</p>
+        </Link>
+        {metrics.map((metric) => (
+          <Link
+            key={metric.label}
+            to={metric.to}
+            className={`rounded-2xl border px-4 py-4 shadow-sm transition ${metric.card}`}
+          >
+            <p className="text-sm text-[#3f4c5a]">{metric.label}</p>
+            <p className={`mt-2 text-3xl font-semibold tracking-tight ${metric.valueColor}`}>{metric.value}</p>
+          </Link>
         ))}
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h2 className="font-semibold">حالة الطلبات</h2>
-          <ul className="mt-3 space-y-2 text-sm">
-            {Object.entries(orderStatusLabel).map(([status, label]) => (
-              <li key={status} className="flex justify-between border-b border-[#e7ebf0] py-2">
-                <span>{label}</span>
-                <span className="font-medium">{statusCounts[status] ?? 0}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card>
-          <h2 className="font-semibold">مخزون يحتاج متابعة</h2>
+      </section>
+
+      <div className="mt-4 grid items-start gap-3 xl:grid-cols-2">
+        <section className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-[#121826]">حالة الطلبات</h2>
+          <StatusCircles counts={statusCounts} total={orders.length} />
+        </section>
+
+        <section className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-[#121826]">مخزون يحتاج متابعة</h2>
+            <Link to="/inventory" className="text-sm text-[#0f766e]">
+              المخزون
+            </Link>
+          </div>
           {lowStock.length === 0 ? (
-            <p className="mt-3 text-sm text-[#667085]">لا توجد متغيرات نشطة بكمية {LOW_STOCK} أو أقل.</p>
+            <p className="mt-6 rounded-2xl bg-[#f3f5f8] px-4 py-5 text-sm leading-6 text-[#667085]">
+              لا توجد متغيرات نشطة بكمية {LOW_STOCK} أو أقل.
+            </p>
           ) : (
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-4 divide-y divide-[#eef2f6] text-sm">
               {lowStock.slice(0, 8).map((variant) => (
-                <li key={variant.id} className="flex justify-between gap-3">
-                  <span>
-                    {variant.productName} · {variant.color} / {variant.size}
+                <li key={variant.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="text-[#344054]">
+                    {variant.productName}
+                    <span className="mt-0.5 block text-xs text-[#667085]">
+                      {variant.color} / {variant.size}
+                    </span>
                   </span>
-                  <span className="font-medium">{variant.stock}</span>
+                  <span className="rounded-full bg-[#fff6e8] px-2.5 py-1 text-xs font-medium text-[#b54708]">
+                    {variant.stock}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </section>
       </div>
-      <Card className="mt-4">
+
+      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">أحدث الطلبات</h2>
+          <h2 className="font-semibold text-[#121826]">أحدث الطلبات</h2>
           <Link to="/orders" className="text-sm text-[#0f766e]">
             كل الطلبات
           </Link>
         </div>
-        <OrderTable orders={orders.slice(0, 6)} />
-      </Card>
+        <RecentOrders orders={orders.slice(0, 6)} />
+      </section>
     </div>
   )
+}
+
+const statusColor: Record<string, string> = {
+  pending: '#d97706',
+  confirmed: '#0f766e',
+  preparing: '#2563eb',
+  out_for_delivery: '#ea580c',
+  delivered: '#16a34a',
+  cancelled: '#e11d48',
+}
+
+function StatusCircles({ counts, total }: { counts: Record<string, number>; total: number }) {
+  const entries = Object.keys(orderStatusLabel).map((status) => ({
+    status,
+    label: orderStatusLabel[status],
+    count: counts[status] ?? 0,
+    color: statusColor[status] ?? '#98a2b3',
+  }))
+  const size = 72
+  const stroke = 6
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+
+  return (
+    <ul className="mt-4 flex flex-wrap justify-around gap-y-4">
+      {entries.map((entry) => {
+        const length = total > 0 ? (entry.count / total) * circumference : 0
+        const full = total > 0 && entry.count === total
+        return (
+          <li key={entry.status} className="flex w-[4.5rem] shrink-0 flex-col items-center text-center">
+            <div className="relative size-[72px]">
+              <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
+                <circle
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill={entry.color}
+                  fillOpacity={entry.count > 0 ? 0.16 : 0.1}
+                  stroke={entry.color}
+                  strokeOpacity={entry.count > 0 ? 0.28 : 0.7}
+                  strokeWidth={stroke}
+                />
+                {length > 0 ? (
+                  <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke={entry.color}
+                    strokeWidth={stroke}
+                    strokeLinecap={full ? 'butt' : 'round'}
+                    strokeDasharray={full ? undefined : `${length} ${circumference - length}`}
+                  />
+                ) : null}
+              </svg>
+              <span className="absolute inset-0 grid place-items-center text-sm font-semibold" style={{ color: entry.color }}>
+                {entry.count}
+              </span>
+            </div>
+            <span className="mt-1.5 text-[11px] leading-4 text-[#344054]">{entry.label}</span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function RecentOrders({ orders }: { orders: AdminOrder[] }) {
+  if (orders.length === 0) return <p className="text-sm text-[#667085]">لا توجد طلبات.</p>
+  return (
+    <ul className="divide-y divide-[#eef2f6]">
+      {orders.map((order) => (
+        <li key={order.id} className="flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <Link to={`/orders/${order.id}`} className="font-medium text-[#0f766e]">
+              {order.reference}
+            </Link>
+            <p className="truncate text-xs text-[#667085]">{order.recipientName}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('order', order.status)}`}>
+                {orderStatusLabel[order.status] ?? order.status}
+              </span>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('payment', order.paymentStatus)}`}>
+                {order.paymentStatus ? paymentStatusLabel[order.paymentStatus] : '—'}
+              </span>
+            </div>
+          </div>
+          <div className="shrink-0 text-end">
+            <p className="font-medium text-[#121826]">{money(order.total)}</p>
+            <p className="mt-1 text-xs text-[#667085]">{when(order.createdAt)}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function pillTone(kind: 'order' | 'payment', value: string | null): string {
+  if (kind === 'payment' && value === 'paid') return 'bg-[#e7f6f3] text-[#0f766e]'
+  if (kind === 'payment' && (value === 'pending' || value === 'awaiting_verification')) {
+    return 'bg-[#fff6e8] text-[#b54708]'
+  }
+  if (kind === 'order' && value === 'delivered') return 'bg-[#e7f6f3] text-[#0f766e]'
+  if (value === 'cancelled' || value === 'rejected') return 'bg-[#f3f5f8] text-[#667085]'
+  return 'bg-[#eef2f6] text-[#344054]'
 }
 
 export function OrderTable({ orders }: { orders: AdminOrder[] }) {
   if (orders.length === 0) return <p className="text-sm text-[#667085]">لا توجد طلبات.</p>
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead className="text-[#667085]">
-          <tr className="border-b border-[#e7ebf0] text-right">
-            <th className="py-2 font-medium">الطلب</th>
-            <th className="py-2 font-medium">الحالة</th>
-            <th className="py-2 font-medium">الدفع</th>
-            <th className="py-2 font-medium">الإجمالي</th>
-            <th className="py-2 font-medium">التاريخ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr key={order.id} className="border-b border-[#e7ebf0]">
-              <td className="py-3">
-                <Link to={`/orders/${order.id}`} className="font-medium text-[#0f766e]">
-                  {order.reference}
-                </Link>
-                <p className="text-xs text-[#667085]">{order.recipientName}</p>
-              </td>
-              <td>{orderStatusLabel[order.status] ?? order.status}</td>
-              <td>{order.paymentStatus ? paymentStatusLabel[order.paymentStatus] : '—'}</td>
-              <td>{money(order.total)}</td>
-              <td className="text-[#667085]">{when(order.createdAt)}</td>
+    <div className="overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-sm">
+          <thead>
+            <tr className="bg-[#f3f5f8] text-right text-xs text-[#667085]">
+              <th className="px-4 py-3 font-medium">الطلب</th>
+              <th className="px-4 py-3 font-medium">الحالة</th>
+              <th className="px-4 py-3 font-medium">الدفع</th>
+              <th className="px-4 py-3 font-medium">الإجمالي</th>
+              <th className="px-4 py-3 font-medium">التاريخ</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id} className="odd:bg-white even:bg-[#f6f8fa] hover:bg-[#eef3f8]">
+                <td className="px-4 py-3">
+                  <Link to={`/orders/${order.id}`} className="font-medium text-[#0f766e]">
+                    {order.reference}
+                  </Link>
+                  <p className="mt-0.5 text-xs text-[#667085]">{order.recipientName}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('order', order.status)}`}>
+                    {orderStatusLabel[order.status] ?? order.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('payment', order.paymentStatus)}`}>
+                    {order.paymentStatus ? paymentStatusLabel[order.paymentStatus] : '—'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 font-medium text-[#121826]">{money(order.total)}</td>
+                <td className="px-4 py-3 text-[#667085]">{when(order.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
