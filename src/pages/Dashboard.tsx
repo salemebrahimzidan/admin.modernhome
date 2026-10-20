@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { money, orderStatusLabel, paymentStatusLabel, when } from '../lib/text'
+import { Check, ClipboardList, Package, Settings, Trash2, Truck, X, type LucideIcon } from 'lucide-react'
+import { ActionIcon, ConfirmPopup } from '../components/ui'
+import { errorText, money, orderStatusLabel, paymentStatusLabel, whenEnglish } from '../lib/text'
 import { fetchProducts, type AdminProduct } from '../services/catalog'
-import { fetchOrders, type AdminOrder } from '../services/orders'
+import { deleteOrder, fetchOrders, type AdminOrder } from '../services/orders'
 
 const LOW_STOCK = 5
 
@@ -11,20 +13,19 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let active = true
-    void Promise.all([fetchProducts(), fetchOrders()])
+  function load() {
+    return Promise.all([fetchProducts(), fetchOrders()])
       .then(([nextProducts, nextOrders]) => {
-        if (!active) return
         setProducts(nextProducts)
         setOrders(nextOrders)
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'تعذر تحميل المؤشرات')
+        setError(cause instanceof Error ? cause.message : 'تعذر تحميل المؤشرات')
       })
-    return () => {
-      active = false
-    }
+  }
+
+  useEffect(() => {
+    void load()
   }, [])
 
   if (error) return <p className="text-sm text-[#b42318]">{error}</p>
@@ -110,13 +111,12 @@ export default function Dashboard() {
         ))}
       </section>
 
-      <div className="mt-4 grid items-start gap-3 xl:grid-cols-2">
-        <section className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
-          <h2 className="font-semibold text-[#121826]">حالة الطلبات</h2>
-          <StatusCircles counts={statusCounts} total={orders.length} />
-        </section>
+      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+        <h2 className="font-semibold text-[#121826]">حالة الطلبات</h2>
+        <StatusCircles counts={statusCounts} total={orders.length} />
+      </section>
 
-        <section className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-[#121826]">مخزون يحتاج متابعة</h2>
             <Link to="/inventory" className="text-sm text-[#0f766e]">
@@ -145,16 +145,15 @@ export default function Dashboard() {
             </ul>
           )}
         </section>
-      </div>
 
-      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
+      <section className="mt-4 overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
           <h2 className="font-semibold text-[#121826]">أحدث الطلبات</h2>
           <Link to="/orders" className="text-sm text-[#0f766e]">
             كل الطلبات
           </Link>
         </div>
-        <RecentOrders orders={orders.slice(0, 6)} />
+        <OrdersTable orders={orders} scroll onDeleted={() => void load()} />
       </section>
     </div>
   )
@@ -225,73 +224,105 @@ function StatusCircles({ counts, total }: { counts: Record<string, number>; tota
   )
 }
 
-function RecentOrders({ orders }: { orders: AdminOrder[] }) {
-  if (orders.length === 0) return <p className="text-sm text-[#667085]">لا توجد طلبات.</p>
-  return (
-    <ul className="divide-y divide-[#eef2f6]">
-      {orders.map((order) => (
-        <li key={order.id} className="flex items-center justify-between gap-3 py-3">
-          <div className="min-w-0">
-            <Link to={`/orders/${order.id}`} className="font-medium text-[#0f766e]">
-              {order.reference}
-            </Link>
-            <p className="truncate text-xs text-[#667085]">{order.recipientName}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('order', order.status)}`}>
-                {orderStatusLabel[order.status] ?? order.status}
-              </span>
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('payment', order.paymentStatus)}`}>
-                {order.paymentStatus ? paymentStatusLabel[order.paymentStatus] : '—'}
-              </span>
-            </div>
-          </div>
-          <div className="shrink-0 text-end">
-            <p className="font-medium text-[#121826]">{money(order.total)}</p>
-            <p className="mt-1 text-xs text-[#667085]">{when(order.createdAt)}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
-  )
+const statusIcons: Record<string, LucideIcon> = {
+  pending: ClipboardList,
+  confirmed: Check,
+  preparing: Settings,
+  out_for_delivery: Truck,
+  delivered: Package,
+  cancelled: X,
+}
+
+function StatusIcon({ status }: { status: string }) {
+  const Icon = statusIcons[status] ?? ClipboardList
+  return <Icon size={14} />
 }
 
 function pillTone(kind: 'order' | 'payment', value: string | null): string {
+  if (kind === 'order') {
+    if (value === 'pending') return 'bg-[#fff7ed] text-[#c2410c]'
+    if (value === 'confirmed') return 'bg-[#dbeafe] text-[#1d4ed8]'
+    if (value === 'preparing') return 'bg-[#ffedd5] text-[#ea580c]'
+    if (value === 'out_for_delivery') return 'bg-[#ede9fe] text-[#7c3aed]'
+    if (value === 'delivered') return 'bg-[#dcfce7] text-[#16a34a]'
+    if (value === 'cancelled') return 'bg-[#ffe4e6] text-[#e11d48]'
+  }
   if (kind === 'payment' && value === 'paid') return 'bg-[#e7f6f3] text-[#0f766e]'
   if (kind === 'payment' && (value === 'pending' || value === 'awaiting_verification')) {
     return 'bg-[#fff6e8] text-[#b54708]'
   }
-  if (kind === 'order' && value === 'delivered') return 'bg-[#e7f6f3] text-[#0f766e]'
-  if (value === 'cancelled' || value === 'rejected') return 'bg-[#f3f5f8] text-[#667085]'
+  if (value === 'rejected' || value === 'cancelled') return 'bg-[#f3f5f8] text-[#667085]'
   return 'bg-[#eef2f6] text-[#344054]'
 }
 
-export function OrderTable({ orders }: { orders: AdminOrder[] }) {
-  if (orders.length === 0) return <p className="text-sm text-[#667085]">لا توجد طلبات.</p>
+export function OrderTable({ orders, onDeleted }: { orders: AdminOrder[]; onDeleted?: () => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
-          <thead>
+      <OrdersTable orders={orders} onDeleted={onDeleted} />
+    </div>
+  )
+}
+
+function OrdersTable({
+  orders,
+  scroll = false,
+  onDeleted,
+}: {
+  orders: AdminOrder[]
+  scroll?: boolean
+  onDeleted?: () => void
+}) {
+  const [pending, setPending] = useState<AdminOrder | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  async function remove() {
+    if (!pending || busy) return
+    setBusy(true)
+    setDeleteError('')
+    try {
+      await deleteOrder(pending.id)
+      setPending(null)
+      onDeleted?.()
+    } catch (cause) {
+      setDeleteError(errorText(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (orders.length === 0) return <p className="px-4 py-6 text-sm text-[#667085]">لا توجد طلبات.</p>
+  return (
+    <>
+      <div className={scroll ? 'max-h-80 overflow-auto' : 'overflow-x-auto'}>
+        <table className="w-full min-w-[720px] border-collapse text-sm">
+          <thead className={scroll ? 'sticky top-0 z-10' : undefined}>
             <tr className="bg-[#f3f5f8] text-right text-xs text-[#667085]">
-              <th className="px-4 py-3 font-medium">الطلب</th>
-              <th className="px-4 py-3 font-medium">الحالة</th>
-              <th className="px-4 py-3 font-medium">الدفع</th>
-              <th className="px-4 py-3 font-medium">الإجمالي</th>
-              <th className="px-4 py-3 font-medium">التاريخ</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">الطلب</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">الحالة</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">الدفع</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">الإجمالي</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">التاريخ</th>
+              <th className="bg-[#f3f5f8] px-4 py-3 font-medium">إجراء</th>
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id} className="odd:bg-white even:bg-[#f6f8fa] hover:bg-[#eef3f8]">
+            {orders.map((order, index) => {
+              const created = whenEnglish(order.createdAt)
+              return (
+              <tr key={order.id} className={`${index % 2 === 1 ? 'bg-[#f6f8fa]' : 'bg-white'} hover:bg-[#eef3f8]`}>
                 <td className="px-4 py-3">
-                  <Link to={`/orders/${order.id}`} className="font-medium text-[#0f766e]">
+                  <Link to={`/orders/${order.id}`} className="font-medium text-[#121826] hover:text-[#0f766e]">
                     {order.reference}
                   </Link>
                   <p className="mt-0.5 text-xs text-[#667085]">{order.recipientName}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs ${pillTone('order', order.status)}`}>
-                    {orderStatusLabel[order.status] ?? order.status}
+                  <span className="inline-flex items-center gap-2">
+                    <span className={`grid size-7 shrink-0 place-items-center rounded-full ${pillTone('order', order.status)}`}>
+                      <StatusIcon status={order.status} />
+                    </span>
+                    <span className="text-sm text-[#344054]">{orderStatusLabel[order.status] ?? order.status}</span>
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -300,12 +331,45 @@ export function OrderTable({ orders }: { orders: AdminOrder[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-3 font-medium text-[#121826]">{money(order.total)}</td>
-                <td className="px-4 py-3 text-[#667085]">{when(order.createdAt)}</td>
+                <td className="whitespace-nowrap px-4 py-3" dir="ltr">
+                  <p className="text-sm font-medium text-[#344054]">{created.date}</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">{created.time}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <ActionIcon
+                    label="حذف"
+                    tone="danger"
+                    disabled={busy}
+                    onClick={() => {
+                      setDeleteError('')
+                      setPending(order)
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </ActionIcon>
+                </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
-    </div>
+      {pending ? (
+        <ConfirmPopup
+          title="حذف الطلب"
+          message={`هل تريد حذف الطلب «${pending.reference}»؟ لا يمكن التراجع عن الحذف.`}
+          confirmLabel="تأكيد الحذف"
+          tone="danger"
+          busy={busy}
+          error={deleteError}
+          onConfirm={() => void remove()}
+          onCancel={() => {
+            if (busy) return
+            setPending(null)
+            setDeleteError('')
+          }}
+        />
+      ) : null}
+    </>
   )
 }

@@ -43,6 +43,7 @@ export interface AdminProduct {
 interface ImageRow {
   id: string
   image_url: string
+  alt_ar: string | null
   is_primary: boolean
   sort_order: number
 }
@@ -99,6 +100,7 @@ function mapProduct(row: ProductRow): AdminProduct {
       url: image.image_url.startsWith('http') ? image.image_url : '',
       primary: image.is_primary,
       sortOrder: image.sort_order,
+      color: image.alt_ar?.trim() ?? '',
     }))
   return {
     id: row.id,
@@ -135,7 +137,7 @@ async function withSignedImages(products: AdminProduct[]): Promise<AdminProduct[
 const productSelect = `
   id, category_id, slug, name_ar, name_en, description_ar, description_en,
   price_egp, compare_at_price_egp, is_visible, is_featured, is_new, is_best_seller,
-  product_images ( id, image_url, is_primary, sort_order ),
+  product_images ( id, image_url, alt_ar, is_primary, sort_order ),
   product_variants ( id, product_id, color, size, sku, price_egp, stock_quantity, is_active )
 `
 
@@ -164,19 +166,27 @@ export async function fetchProducts(): Promise<AdminProduct[]> {
   return withSignedImages(((data ?? []) as ProductRow[]).map(mapProduct))
 }
 
+function categoryWriteError(error: { message: string }): Error {
+  if (error.message.includes('categories_name_en_len')) {
+    return new Error('الاسم الإنجليزي أطول من المسموح، أو اتركه فارغاً ليُستخدم الاسم العربي.')
+  }
+  return new Error(error.message)
+}
+
 export async function createCategory(input: {
   nameAr: string
   nameEn: string
   slug: string
   visible: boolean
 }): Promise<void> {
+  const nameAr = input.nameAr.trim()
   const { error } = await supabase.from('categories').insert({
-    name_ar: input.nameAr.trim(),
-    name_en: input.nameEn.trim(),
+    name_ar: nameAr,
+    name_en: input.nameEn.trim() || nameAr,
     slug: input.slug,
     is_visible: input.visible,
   })
-  if (error) throw error
+  if (error) throw categoryWriteError(error)
 }
 
 export async function updateCategory(
@@ -190,13 +200,13 @@ export async function updateCategory(
     is_visible?: boolean
     sort_order?: number
   } = {}
-  if (patch.nameAr !== undefined) row.name_ar = patch.nameAr
-  if (patch.nameEn !== undefined) row.name_en = patch.nameEn
+  if (patch.nameAr !== undefined) row.name_ar = patch.nameAr.trim()
+  if (patch.nameEn !== undefined) row.name_en = patch.nameEn.trim() || patch.nameAr?.trim() || ''
   if (patch.slug !== undefined) row.slug = patch.slug
   if (patch.visible !== undefined) row.is_visible = patch.visible
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
   const { error } = await supabase.from('categories').update(row).eq('id', id)
-  if (error) throw error
+  if (error) throw categoryWriteError(error)
 }
 
 export async function deleteCategory(id: string): Promise<void> {
@@ -222,8 +232,14 @@ export async function createProduct(input: {
   slug: string
   nameAr: string
   nameEn: string
+  descriptionAr: string
+  descriptionEn: string
   price: number
+  compareAt: number | null
   visible: boolean
+  featured: boolean
+  isNew: boolean
+  bestSeller: boolean
 }): Promise<string> {
   const { data, error } = await supabase
     .from('products')
@@ -232,8 +248,14 @@ export async function createProduct(input: {
       slug: input.slug,
       name_ar: input.nameAr.trim(),
       name_en: input.nameEn.trim(),
+      description_ar: input.descriptionAr.trim(),
+      description_en: input.descriptionEn.trim(),
       price_egp: input.price,
+      compare_at_price_egp: input.compareAt,
       is_visible: input.visible,
+      is_featured: input.featured,
+      is_new: input.isNew,
+      is_best_seller: input.bestSeller,
     })
     .select('id')
     .single()
@@ -241,13 +263,21 @@ export async function createProduct(input: {
   return data.id as string
 }
 
+const deleteNotAllowed = 'حذف المنتجات غير مسموح لهذا الحساب في قاعدة البيانات.'
+
 export async function deleteProduct(product: AdminProduct): Promise<void> {
   if (product.variants.length > 0) {
-    const removedVariants = await supabase.from('product_variants').delete().eq('product_id', product.id)
+    const removedVariants = await supabase
+      .from('product_variants')
+      .delete()
+      .eq('product_id', product.id)
+      .select('id')
     if (removedVariants.error) throw productDeleteError(removedVariants.error)
+    if ((removedVariants.data ?? []).length === 0) throw new Error(deleteNotAllowed)
   }
-  const removed = await supabase.from('products').delete().eq('id', product.id)
+  const removed = await supabase.from('products').delete().eq('id', product.id).select('id')
   if (removed.error) throw productDeleteError(removed.error)
+  if ((removed.data ?? []).length === 0) throw new Error(deleteNotAllowed)
   const paths = product.images.map((image) => image.path).filter(isStoragePath)
   if (paths.length > 0) {
     await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove(paths)
@@ -257,7 +287,7 @@ export async function deleteProduct(product: AdminProduct): Promise<void> {
 function productDeleteError(error: { message: string; code?: string }): Error {
   const message = error.message.toLowerCase()
   if (message.includes('permission denied') || error.code === '42501') {
-    return new Error('حذف المنتجات غير مسموح لهذا الحساب في قاعدة البيانات.')
+    return new Error(deleteNotAllowed)
   }
   if (error.code === '23503' || message.includes('foreign key')) {
     return new Error('لا يمكن حذف المنتج لأنه مرتبط بطلب أو سلة.')
@@ -325,7 +355,14 @@ export async function createVariant(input: {
 
 export async function updateVariant(
   id: string,
-  input: { price: number | null; stock: number; active: boolean },
+  input: {
+    price: number | null
+    stock: number
+    active: boolean
+    color?: string
+    size?: string
+    sku?: string
+  },
 ): Promise<void> {
   const { error } = await supabase
     .from('product_variants')
@@ -333,7 +370,15 @@ export async function updateVariant(
       price_egp: input.price,
       stock_quantity: input.stock,
       is_active: input.active,
+      ...(input.color !== undefined ? { color: input.color.trim() || 'قياسي' } : {}),
+      ...(input.size !== undefined ? { size: input.size.trim() || 'موحّد' } : {}),
+      ...(input.sku !== undefined ? { sku: input.sku.trim() || null } : {}),
     })
     .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteVariant(id: string): Promise<void> {
+  const { error } = await supabase.from('product_variants').delete().eq('id', id)
   if (error) throw error
 }

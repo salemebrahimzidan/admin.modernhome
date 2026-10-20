@@ -15,6 +15,8 @@ export interface GalleryImage {
   url: string
   primary: boolean
   sortOrder: number
+  /** Empty means the photo is shared by every color. Stored in alt_ar. */
+  color: string
 }
 
 export function isStoragePath(value: string): boolean {
@@ -93,6 +95,7 @@ export async function uploadProductImages(
   files: File[],
   startOrder: number,
   firstIsPrimary: boolean,
+  colors: string[] = [],
 ): Promise<void> {
   for (const [index, file] of files.entries()) {
     const blob = await compressProductImage(file)
@@ -108,6 +111,7 @@ export async function uploadProductImages(
       id,
       product_id: productId,
       image_url: path,
+      alt_ar: colors[index]?.trim() ?? '',
       sort_order: startOrder + index,
       is_primary: firstIsPrimary && index === 0,
     })
@@ -127,11 +131,23 @@ export async function saveImageOrder(productId: string, images: GalleryImage[]):
   for (const [index, image] of images.entries()) {
     const updated = await supabase
       .from('product_images')
-      .update({ sort_order: index, is_primary: index === 0 })
+      .update({ sort_order: index, is_primary: index === 0, alt_ar: image.color.trim() })
       .eq('id', image.id)
       .eq('product_id', productId)
     if (updated.error) throw updated.error
   }
+}
+
+export async function saveImageColor(id: string, color: string): Promise<void> {
+  const { error } = await supabase.from('product_images').update({ alt_ar: color.trim() }).eq('id', id)
+  if (error) throw error
+}
+
+export async function renameImageColor(productId: string, from: string, to: string): Promise<void> {
+  const next = to.trim()
+  if (!from || from === next) return
+  const { error } = await supabase.from('product_images').update({ alt_ar: next }).eq('product_id', productId).eq('alt_ar', from)
+  if (error) throw error
 }
 
 export async function deleteProductImage(image: GalleryImage): Promise<void> {

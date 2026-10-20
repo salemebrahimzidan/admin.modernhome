@@ -1,13 +1,13 @@
 import { Pencil, Trash2 } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ActionIcon, Button, ConfirmPopup, Notice, Popup, TextInput } from '../components/ui'
-import { errorText, money, slugify } from '../lib/text'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ActionIcon, Button, ConfirmPopup, Notice } from '../components/ui'
+import { errorText, money } from '../lib/text'
 import {
-  createProduct,
   deleteProduct,
   fetchCategories,
   fetchProducts,
+  updateProduct,
   type AdminCategory,
   type AdminProduct,
 } from '../services/catalog'
@@ -16,70 +16,26 @@ export default function Products() {
   const navigate = useNavigate()
   const [products, setProducts] = useState<AdminProduct[] | null>(null)
   const [categories, setCategories] = useState<AdminCategory[]>([])
-  const [creating, setCreating] = useState(false)
-  const [categoryId, setCategoryId] = useState('')
-  const [nameAr, setNameAr] = useState('')
-  const [nameEn, setNameEn] = useState('')
-  const [price, setPrice] = useState('')
   const [error, setError] = useState('')
-  const [formError, setFormError] = useState('')
-  const [busy, setBusy] = useState(false)
 
   async function load() {
     const [nextProducts, nextCategories] = await Promise.all([fetchProducts(), fetchCategories()])
     setProducts(nextProducts)
     setCategories(nextCategories)
-    setCategoryId((current) => current || nextCategories[0]?.id || '')
   }
 
   useEffect(() => {
     void load().catch((cause: unknown) => setError(errorText(cause)))
   }, [])
 
-  function openCreate() {
-    setFormError('')
-    setNameAr('')
-    setNameEn('')
-    setPrice('')
-    setCategoryId(categories[0]?.id ?? '')
-    setCreating(true)
-  }
-
-  async function onCreate(event: FormEvent) {
-    event.preventDefault()
-    if (busy) return
-    const slug = slugify(nameEn)
-    const amount = Number(price)
-    if (!slug || !categoryId || !nameAr.trim() || !Number.isFinite(amount) || amount < 0) {
-      setFormError('أكمل القسم والاسمين والسعر.')
-      return
-    }
-    setBusy(true)
-    setFormError('')
-    try {
-      const id = await createProduct({
-        categoryId,
-        slug,
-        nameAr,
-        nameEn,
-        price: amount,
-        visible: false,
-      })
-      navigate(`/products/${id}`)
-    } catch (cause) {
-      setFormError(errorText(cause))
-      setBusy(false)
-    }
-  }
-
   return (
     <div className="w-full">
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#121826]">المنتجات</h1>
-          <p className="mt-1 text-sm text-[#667085]">المنتج الجديد يبقى مخفياً حتى تفعّله وتضيف متغيراً نشطاً.</p>
+          <p className="mt-1 text-sm text-[#667085]">أضف الاسم والوصف والسعر والصور والمخزون من صفحة واحدة.</p>
         </div>
-        <Button onClick={openCreate} disabled={categories.length === 0}>
+        <Button onClick={() => navigate('/products/new')} disabled={categories.length === 0}>
           إضافة منتج
         </Button>
       </header>
@@ -117,65 +73,6 @@ export default function Products() {
           </div>
         )}
       </section>
-
-      {creating ? (
-        <Popup title="إضافة منتج" busy={busy} onCancel={() => setCreating(false)}>
-          <form className="mt-4 grid gap-3" onSubmit={(event) => void onCreate(event)}>
-            <label className="block text-xs text-[#667085]">
-              القسم
-              <select
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-[#e7ebf0] bg-white px-3 py-2 text-sm outline-none focus:border-[#0f766e]"
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.nameAr}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-xs text-[#667085]">
-              الاسم بالعربية
-              <TextInput
-                className="mt-1.5"
-                required
-                value={nameAr}
-                onChange={(event) => setNameAr(event.target.value)}
-              />
-            </label>
-            <label className="block text-xs text-[#667085]">
-              English name
-              <TextInput
-                className="mt-1.5"
-                required
-                dir="ltr"
-                value={nameEn}
-                onChange={(event) => setNameEn(event.target.value)}
-              />
-            </label>
-            <label className="block text-xs text-[#667085]">
-              السعر
-              <TextInput
-                className="mt-1.5"
-                required
-                inputMode="decimal"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-              />
-            </label>
-            {formError ? <p className="text-sm text-[#b42318]">{formError}</p> : null}
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button tone="ghost" disabled={busy} onClick={() => setCreating(false)}>
-                إلغاء
-              </Button>
-              <Button type="submit" disabled={busy || !categoryId}>
-                {busy ? 'جارٍ الحفظ...' : 'إنشاء منتج'}
-              </Button>
-            </div>
-          </form>
-        </Popup>
-      ) : null}
     </div>
   )
 }
@@ -196,6 +93,33 @@ function ProductRow({
   const [busy, setBusy] = useState(false)
   const rowTone = striped ? 'bg-[#f6f8fa]' : 'bg-white'
 
+  async function toggleVisible() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await updateProduct(product.id, {
+        categoryId: product.categoryId,
+        slug: product.slug,
+        nameAr: product.nameAr,
+        nameEn: product.nameEn,
+        descriptionAr: product.descriptionAr,
+        descriptionEn: product.descriptionEn,
+        price: product.price,
+        compareAt: product.compareAt,
+        visible: !product.visible,
+        featured: product.featured,
+        isNew: product.isNew,
+        bestSeller: product.bestSeller,
+      })
+      await onSaved()
+    } catch (cause) {
+      setError(errorText(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function remove() {
     if (busy) return
     setBusy(true)
@@ -214,21 +138,30 @@ function ProductRow({
   return (
     <tr className={`${rowTone} hover:bg-[#eef3f8]`}>
       <td className="px-4 py-3">
-        <span className="font-medium text-[#121826]">{product.nameAr}</span>
-        <p className="text-xs text-[#667085]" dir="ltr">
-          {product.nameEn}
-        </p>
+        <Link to={`/products/${product.id}`} className="font-medium text-[#121826] hover:text-[#0f766e]">
+          {product.nameAr}
+        </Link>
       </td>
       <td className="px-4 py-3">{money(product.price)}</td>
       <td className="px-4 py-3">{product.variants.length}</td>
       <td className="px-4 py-3">
-        <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-xs ${
-            product.visible ? 'bg-[#ecfdf3] text-[#16a34a]' : 'bg-[#f3f5f8] text-[#667085]'
-          }`}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={product.visible}
+          aria-label={product.visible ? 'ظاهر' : 'مخفي'}
+          disabled={busy}
+          onClick={() => void toggleVisible()}
+          className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-xs font-medium disabled:opacity-50"
         >
-          {product.visible ? 'ظاهر' : 'مخفي'}
-        </span>
+          <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${product.visible ? 'bg-[#0f766e]' : 'bg-[#d0d5dd]'}`}>
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${product.visible ? 'end-0.5' : 'start-0.5'}`}
+            />
+          </span>
+          <span className={product.visible ? 'text-[#067647]' : 'text-[#667085]'}>{product.visible ? 'ظاهر' : 'مخفي'}</span>
+        </button>
+        {error && !confirmDelete ? <p className="mt-1 text-xs text-[#b42318]">{error}</p> : null}
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1.5">

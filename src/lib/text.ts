@@ -7,8 +7,63 @@ export function errorText(cause: unknown): string {
   return 'تعذر تنفيذ الطلب'
 }
 
-export function slugify(value: string): string {
+const arabicToLatin: Record<string, string> = {
+  ا: 'a',
+  أ: 'a',
+  إ: 'a',
+  آ: 'a',
+  ء: '',
+  ب: 'b',
+  ت: 't',
+  ث: 'th',
+  ج: 'j',
+  ح: 'h',
+  خ: 'kh',
+  د: 'd',
+  ذ: 'dh',
+  ر: 'r',
+  ز: 'z',
+  س: 's',
+  ش: 'sh',
+  ص: 's',
+  ض: 'd',
+  ط: 't',
+  ظ: 'z',
+  ع: 'a',
+  غ: 'gh',
+  ف: 'f',
+  ق: 'q',
+  ك: 'k',
+  ل: 'l',
+  م: 'm',
+  ن: 'n',
+  ه: 'h',
+  ة: 'h',
+  و: 'w',
+  ي: 'y',
+  ى: 'a',
+  ئ: 'y',
+  ؤ: 'w',
+  '٠': '0',
+  '١': '1',
+  '٢': '2',
+  '٣': '3',
+  '٤': '4',
+  '٥': '5',
+  '٦': '6',
+  '٧': '7',
+  '٨': '8',
+  '٩': '9',
+}
+
+function latinize(value: string): string {
   return value
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+    .replace(/[\u0600-\u06FF]/g, (char) => arabicToLatin[char] ?? '')
+}
+
+export function slugify(value: string): string {
+  return latinize(value)
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
@@ -28,6 +83,22 @@ export function when(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+export function whenEnglish(value: string): { date: string; time: string } {
+  const parsed = new Date(value)
+  return {
+    date: new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(parsed),
+    time: new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(parsed),
+  }
 }
 
 export const orderStatusLabel: Record<string, string> = {
