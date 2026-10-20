@@ -149,6 +149,25 @@ export async function updateOrderStatus(
   if (error) throw error
 }
 
+export async function deleteOrder(orderId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_order', { p_order_id: orderId })
+  if (error) throw orderDeleteError(error)
+}
+
+function orderDeleteError(error: { message: string; code?: string }): Error {
+  const message = error.message
+  if (message.includes('ADMIN_REQUIRED') || message.toLowerCase().includes('permission denied')) {
+    return new Error('حذف الطلبات غير مسموح لهذا الحساب.')
+  }
+  if (message.includes('ORDER_NOT_FOUND')) {
+    return new Error('الطلب غير موجود.')
+  }
+  if (error.code === 'PGRST202' || message.includes('admin_delete_order')) {
+    return new Error('حذف الطلبات غير مفعّل في قاعدة البيانات بعد.')
+  }
+  return new Error(message || 'تعذر حذف الطلب')
+}
+
 export async function reviewPayment(
   orderId: string,
   status: 'paid' | 'rejected',

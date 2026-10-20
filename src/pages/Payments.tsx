@@ -8,8 +8,8 @@ export default function Payments() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    void fetchOrders()
+  function load() {
+    return fetchOrders()
       .then((all) =>
         setOrders(
           all.filter(
@@ -19,6 +19,10 @@ export default function Payments() {
         ),
       )
       .catch((cause: unknown) => setError(errorText(cause)))
+  }
+
+  useEffect(() => {
+    void load()
   }, [])
 
   return (
@@ -28,7 +32,7 @@ export default function Payments() {
         detail="فودافون كاش يبقى بانتظار المراجعة حتى تؤكد التحصيل أو ترفضه. الدفع عند الاستلام يظهر هنا وهو معلّق."
       />
       {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
-      {orders ? <OrderTable orders={orders} /> : <p className="text-sm text-[#667085]">جارٍ التحميل...</p>}
+      {orders ? <OrderTable orders={orders} onDeleted={() => void load()} /> : <p className="text-sm text-[#667085]">جارٍ التحميل...</p>}
     </div>
   )
 }
