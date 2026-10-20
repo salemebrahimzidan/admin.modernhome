@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, ClipboardList, Package, Settings, Trash2, Truck, X, type LucideIcon } from 'lucide-react'
-import { ActionIcon, ConfirmPopup } from '../components/ui'
+import { Banknote, Boxes, Check, ClipboardList, Eye, Package, Settings, Trash2, TriangleAlert, Truck, X, type LucideIcon } from 'lucide-react'
+import { ActionIcon, ConfirmPopup, Skeleton, TableSkeleton } from '../components/ui'
 import { errorText, money, orderStatusLabel, paymentStatusLabel, whenEnglish } from '../lib/text'
 import { fetchProducts, type AdminProduct } from '../services/catalog'
 import { deleteOrder, fetchOrders, type AdminOrder } from '../services/orders'
@@ -28,8 +28,22 @@ export default function Dashboard() {
     void load()
   }, [])
 
-  if (error) return <p className="text-sm text-[#b42318]">{error}</p>
-  if (!products || !orders) return <p className="text-sm text-[#667085]">جارٍ تحميل المؤشرات...</p>
+  if (error && (!products || !orders)) {
+    return (
+      <div className="w-full">
+        <DashboardHeader />
+        <p className="text-sm text-[#b42318]">{error}</p>
+      </div>
+    )
+  }
+  if (!products || !orders) {
+    return (
+      <div className="w-full">
+        <DashboardHeader />
+        <DashboardSkeleton />
+      </div>
+    )
+  }
 
   const variants = products.flatMap((product) => product.variants)
   const activeStock = variants.filter((variant) => variant.active).reduce((sum, variant) => sum + variant.stock, 0)
@@ -47,68 +61,81 @@ export default function Dashboard() {
 
   const visibleCount = products.filter((product) => product.visible).length
 
-  const metrics = [
+  const low = lowStock.length > 0
+  const metrics: {
+    label: string
+    value: string
+    hint?: string
+    to: string
+    icon: LucideIcon
+    iconClass: string
+    valueColor: string
+  }[] = [
+    {
+      label: 'محصّل',
+      value: money(paidTotal),
+      hint: `${awaiting.length} مدفوعات بانتظار الإجراء`,
+      to: '/payments',
+      icon: Banknote,
+      iconClass: 'bg-[#ccfbf1] text-[#0f766e]',
+      valueColor: 'text-[#0f766e]',
+    },
     {
       label: 'المنتجات',
       value: String(products.length),
       to: '/products',
-      card: 'border-[#bfdbfe] bg-[#eff6ff] hover:border-[#93c5fd]',
+      icon: Package,
+      iconClass: 'bg-[#dbeafe] text-[#1d4ed8]',
       valueColor: 'text-[#1d4ed8]',
     },
     {
       label: 'الظاهرة في المتجر',
       value: String(visibleCount),
       to: '/products',
-      card: 'border-[#a7f3d0] bg-[#ecfdf5] hover:border-[#6ee7b7]',
+      icon: Eye,
+      iconClass: 'bg-[#d1fae5] text-[#047857]',
       valueColor: 'text-[#047857]',
     },
     {
       label: 'وحدات المخزون النشط',
       value: String(activeStock),
       to: '/inventory',
-      card: 'border-[#fde68a] bg-[#fffbeb] hover:border-[#fcd34d]',
+      icon: Boxes,
+      iconClass: 'bg-[#fef3c7] text-[#b45309]',
       valueColor: 'text-[#b45309]',
     },
     {
       label: 'مخزون منخفض',
       value: String(lowStock.length),
       to: '/inventory',
-      card:
-        lowStock.length > 0
-          ? 'border-[#fecdd3] bg-[#fff1f2] hover:border-[#fda4af]'
-          : 'border-[#bbf7d0] bg-[#f0fdf4] hover:border-[#86efac]',
-      valueColor: lowStock.length > 0 ? 'text-[#be123c]' : 'text-[#15803d]',
+      icon: TriangleAlert,
+      iconClass: low ? 'bg-[#ffe4e6] text-[#be123c]' : 'bg-[#dcfce7] text-[#15803d]',
+      valueColor: low ? 'text-[#be123c]' : 'text-[#15803d]',
     },
   ]
 
   return (
     <div className="w-full">
-      <header className="mb-5">
-        <h1 className="text-3xl font-semibold tracking-tight text-[#121826]">المؤشرات</h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-[#667085]">
-          ملخص الكتالوج والطلبات والمدفوعات من قاعدة البيانات الحالية.
-        </p>
-      </header>
+      <DashboardHeader />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <Link
-          to="/payments"
-          className="rounded-2xl bg-[#0f766e] px-4 py-4 text-white shadow-sm transition hover:bg-[#0d655e]"
-        >
-          <p className="text-sm text-white/70">محصّل</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight">{money(paidTotal)}</p>
-          <p className="mt-3 text-xs leading-5 text-white/80">{awaiting.length} مدفوعات بانتظار الإجراء</p>
-        </Link>
-        {metrics.map((metric) => (
-          <Link
-            key={metric.label}
-            to={metric.to}
-            className={`rounded-2xl border px-4 py-4 shadow-sm transition ${metric.card}`}
-          >
-            <p className="text-sm text-[#3f4c5a]">{metric.label}</p>
-            <p className={`mt-2 text-3xl font-semibold tracking-tight ${metric.valueColor}`}>{metric.value}</p>
-          </Link>
-        ))}
+        {metrics.map((metric) => {
+          const Icon = metric.icon
+          return (
+            <Link
+              key={metric.label}
+              to={metric.to}
+              className="flex h-full flex-col rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm transition hover:border-[#d0d5dd] hover:shadow-md"
+            >
+              <span className={`grid size-9 place-items-center rounded-xl ${metric.iconClass}`}>
+                <Icon size={18} />
+              </span>
+              <span className={`mt-4 text-3xl font-semibold leading-none tracking-tight ${metric.valueColor}`}>{metric.value}</span>
+              <span className="mt-2 text-sm leading-5 text-[#344054]">{metric.label}</span>
+              {metric.hint ? <span className="mt-1 text-xs leading-5 text-[#667085]">{metric.hint}</span> : null}
+            </Link>
+          )
+        })}
       </section>
 
       <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
@@ -166,6 +193,51 @@ const statusColor: Record<string, string> = {
   out_for_delivery: '#ea580c',
   delivered: '#16a34a',
   cancelled: '#e11d48',
+}
+
+function DashboardHeader() {
+  return (
+    <header className="mb-5">
+      <h1 className="text-3xl font-semibold tracking-tight text-[#121826]">المؤشرات</h1>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[#667085]">
+        ملخص الكتالوج والطلبات والمدفوعات من قاعدة البيانات الحالية.
+      </p>
+    </header>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="جارٍ تحميل المؤشرات">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+            <Skeleton className="size-9 rounded-xl" />
+            <Skeleton className="mt-4 h-8 w-16" />
+            <Skeleton className="mt-3 h-4 w-24" />
+          </div>
+        ))}
+      </section>
+      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+        <Skeleton className="h-5 w-32" />
+        <div className="mt-4 flex flex-wrap justify-around gap-y-4">
+          {Array.from({ length: 6 }, (_, index) => (
+            <Skeleton key={index} className="size-[72px] rounded-full" />
+          ))}
+        </div>
+      </section>
+      <section className="mt-4 rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-4 h-16 w-full" />
+      </section>
+      <section className="mt-4 overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
+        <div className="px-4 py-3">
+          <Skeleton className="h-5 w-28" />
+        </div>
+        <TableSkeleton rows={4} />
+      </section>
+    </div>
+  )
 }
 
 function StatusCircles({ counts, total }: { counts: Record<string, number>; total: number }) {

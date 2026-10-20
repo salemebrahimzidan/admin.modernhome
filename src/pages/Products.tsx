@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ActionIcon, Button, ConfirmPopup, Notice } from '../components/ui'
+import { ActionIcon, Button, ConfirmPopup, Notice, TableSkeleton } from '../components/ui'
 import { errorText, money } from '../lib/text'
 import {
   deleteProduct,
@@ -43,7 +43,7 @@ export default function Products() {
 
       <section className="overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
         {products === null ? (
-          <p className="px-4 py-6 text-sm text-[#667085]">جارٍ التحميل...</p>
+          <TableSkeleton />
         ) : products.length === 0 ? (
           <p className="px-4 py-6 text-sm text-[#667085]">لا توجد منتجات بعد.</p>
         ) : (

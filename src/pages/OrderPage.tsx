@@ -18,7 +18,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { ConfirmPopup, Notice, Popup, TextInput } from '../components/ui'
+import { BlockSkeleton, ConfirmPopup, Notice, Popup, TextInput } from '../components/ui'
 import { errorText, money, nextOrderStatus, orderStatusLabel, paymentStatusLabel, whenEnglish } from '../lib/text'
 import { fetchProducts } from '../services/catalog'
 import { deleteOrder, fetchOrders, reviewPayment, updateOrderStatus, type AdminOrder } from '../services/orders'
@@ -148,7 +148,7 @@ export default function OrderPage() {
     }
   }
 
-  if (order === undefined && !error) return <p className="text-sm text-[#667085]">جارٍ التحميل...</p>
+  if (order === undefined && !error) return <BlockSkeleton />
   if (!order) {
     return (
       <div>

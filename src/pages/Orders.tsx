@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PageTitle } from '../components/ui'
+import { PageTitle, TableSkeleton } from '../components/ui'
 import { errorText } from '../lib/text'
 import { fetchOrders, type AdminOrder } from '../services/orders'
 import { OrderTable } from './Dashboard'
@@ -22,7 +22,13 @@ export default function Orders() {
     <div>
       <PageTitle title="الطلبات" detail="تغيير الحالة يتم عبر الدالة المحفوظة في قاعدة البيانات، وليس بتعديل الصف مباشرة." />
       {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
-      {orders ? <OrderTable orders={orders} onDeleted={() => void load()} /> : <p className="text-sm text-[#667085]">جارٍ التحميل...</p>}
+      {orders ? (
+        <OrderTable orders={orders} onDeleted={() => void load()} />
+      ) : error ? null : (
+        <section className="overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
+          <TableSkeleton />
+        </section>
+      )}
     </div>
   )
 }

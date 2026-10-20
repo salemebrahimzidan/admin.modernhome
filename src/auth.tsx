@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { AppFrame } from './components/Shell'
+import { BlockSkeleton } from './components/ui'
 import { supabase } from './lib/supabase'
 
 interface AuthValue {
@@ -105,7 +107,11 @@ export function AdminGate() {
   const location = useLocation()
 
   if (!ready) {
-    return <div className="grid min-h-screen place-items-center text-sm text-[#667085]">جارٍ التحقق من الصلاحية...</div>
+    return (
+      <AppFrame email={session?.user.email} onSignOut={() => void signOut()}>
+        <BlockSkeleton />
+      </AppFrame>
+    )
   }
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   if (!isAdmin) {
