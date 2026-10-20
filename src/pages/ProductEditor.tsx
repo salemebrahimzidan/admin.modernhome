@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, ImagePlus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ActionIcon, Button, ConfirmPopup, Notice, Select, TextInput } from '../components/ui'
+import { ActionIcon, BlockSkeleton, Button, ConfirmPopup, Notice, Select, TextInput } from '../components/ui'
 import { errorText, slugify } from '../lib/text'
 import {
   createProduct,
@@ -79,7 +79,7 @@ export default function ProductEditor() {
   }, [id])
 
   if (!isNew && product === undefined && !error) {
-    return <p className="text-sm text-[#667085]">جارٍ التحميل...</p>
+    return <BlockSkeleton />
   }
   if (!isNew && !product) {
     return (

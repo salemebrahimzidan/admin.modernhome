@@ -11,6 +11,44 @@ export function PageTitle({ title, detail }: { title: string; detail?: string })
   )
 }
 
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <span className={`block animate-pulse rounded-lg bg-[#e7ebf0] ${className}`} aria-hidden="true" />
+}
+
+export function TableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="px-4 py-2" aria-busy="true" aria-label="جارٍ تحميل البيانات">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="flex items-center gap-4 border-b border-[#f6f7f9] py-3.5 last:border-0">
+          <Skeleton className="h-4 w-2/5" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="hidden h-4 w-16 sm:block" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function BlockSkeleton() {
+  return (
+    <div className="w-full" aria-busy="true" aria-label="جارٍ تحميل البيانات">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="mt-3 h-4 w-full max-w-md" />
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        {Array.from({ length: 2 }, (_, index) => (
+          <div key={index} className="rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="mt-4 h-4 w-full" />
+            <Skeleton className="mt-3 h-4 w-4/5" />
+            <Skeleton className="mt-3 h-4 w-2/3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-2xl border border-[#e7ebf0] bg-white p-4 shadow-sm ${className}`}>

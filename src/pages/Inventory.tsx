@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Button, Notice, Popup, Select, TextInput } from '../components/ui'
+import { Button, Notice, Popup, Select, TableSkeleton, TextInput } from '../components/ui'
 import { errorText } from '../lib/text'
 import {
   createVariant,
@@ -48,7 +48,7 @@ export default function Inventory() {
 
       <section className="overflow-hidden rounded-2xl border border-[#e7ebf0] bg-white shadow-sm">
         {products === null ? (
-          <p className="px-4 py-6 text-sm text-[#667085]">جارٍ التحميل...</p>
+          <TableSkeleton />
         ) : listed.length === 0 ? (
           <p className="px-4 py-6 text-sm text-[#667085]">لا توجد متغيرات بعد.</p>
         ) : (

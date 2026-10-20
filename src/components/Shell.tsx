@@ -7,6 +7,7 @@ import {
   Warehouse,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuth } from '../auth'
 
 const links = [
@@ -18,9 +19,15 @@ const links = [
   { to: '/payments', label: 'المدفوعات', icon: BadgeCheck, end: false },
 ]
 
-export default function Shell() {
-  const { session, signOut } = useAuth()
-
+export function AppFrame({
+  email,
+  onSignOut,
+  children,
+}: {
+  email?: string
+  onSignOut: () => void
+  children: ReactNode
+}) {
   return (
     <div className="app-shell min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="flex flex-col bg-[#121826] text-white md:sticky md:top-0 md:h-dvh print:hidden">
@@ -48,19 +55,26 @@ export default function Shell() {
           ))}
         </nav>
         <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3 md:block">
-          <p className="truncate text-xs text-white/60">{session?.user.email}</p>
+          <p className="truncate text-xs text-white/60">{email}</p>
           <button
             type="button"
             className="shrink-0 rounded-xl bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15 md:mt-3 md:w-full"
-            onClick={() => void signOut()}
+            onClick={onSignOut}
           >
             خروج
           </button>
         </div>
       </aside>
-      <main className="min-w-0 w-full px-4 py-6 md:px-6">
-        <Outlet />
-      </main>
+      <main className="min-w-0 w-full px-4 py-6 md:px-6">{children}</main>
     </div>
+  )
+}
+
+export default function Shell() {
+  const { session, signOut } = useAuth()
+  return (
+    <AppFrame email={session?.user.email} onSignOut={() => void signOut()}>
+      <Outlet />
+    </AppFrame>
   )
 }
